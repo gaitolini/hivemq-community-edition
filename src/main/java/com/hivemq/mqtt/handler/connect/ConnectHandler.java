@@ -727,10 +727,18 @@ public class ConnectHandler extends SimpleChannelInboundHandler<CONNECT> impleme
 
     private void addKeepAliveHandler(final @NotNull ChannelHandlerContext ctx, final @NotNull CONNECT msg) {
 
-        if (msg.getKeepAlive() > 0) {
+        final int keepAlive;
+        if ((msg.getKeepAlive() == 0 && !allowZeroKeepAlive) || (msg.getKeepAlive() > serverKeepAliveMaximum)) {
+            log.trace("Client {} used keepAlive {} which is invalid, using server maximum of {}", msg.getClientIdentifier(), msg.getKeepAlive(), serverKeepAliveMaximum);
+            keepAlive = serverKeepAliveMaximum;
+        } else {
+            keepAlive = msg.getKeepAlive();
+        }
+
+        if (keepAlive > 0) {
 
             // The MQTT spec defines a 1.5 grace period
-            final Double keepAliveValue = msg.getKeepAlive() * getGracePeriod();
+            final Double keepAliveValue = keepAlive * getGracePeriod();
             log.trace("Client specified a keepAlive value of {}s. The maximum timeout before disconnecting is {}s", msg.getKeepAlive(), keepAliveValue);
             ctx.pipeline().addFirst(MQTT_KEEPALIVE_IDLE_NOTIFIER_HANDLER, new IdleStateHandler(keepAliveValue.intValue(), 0, 0, TimeUnit.SECONDS));
             ctx.pipeline().addAfter(MQTT_KEEPALIVE_IDLE_NOTIFIER_HANDLER, MQTT_KEEPALIVE_IDLE_HANDLER, new KeepAliveIdleHandler(eventLog));
